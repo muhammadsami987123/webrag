@@ -1,0 +1,127 @@
+/* WebRAG shared editorial styles — supplements Tailwind utility classes */
+
+:root {
+  --paper: #faf8f4;
+  --paper-raised: #ffffff;
+  --ink: #1c1b19;
+  --ink-soft: #55524a;
+  --ink-faint: #8a867b;
+  --line: #e4e0d6;
+  --line-strong: #cfc9ba;
+  --accent: #1f4b3f;
+  --accent-soft: #e7efec;
+  --accent-hover: #163a30;
+  --amber: #92620a;
+  --amber-soft: #fbf1de;
+  --red: #9a3324;
+  --red-soft: #fbeae6;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.font-serif-edit {
+  font-family: 'Newsreader', Georgia, 'Times New Roman', serif;
+}
+
+/* Custom thin scrollbar for panels */
+.thin-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.thin-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.thin-scroll::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: 4px;
+}
+.thin-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--ink-faint);
+}
+
+/* Citation pill markers inline in answer text */
+.citation-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  padding: 0 0.28rem;
+  margin: 0 1px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  line-height: 1;
+  border-radius: 3px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border: 1px solid transparent;
+  cursor: pointer;
+  vertical-align: super;
+  transition: background 150ms ease, color 150ms ease, transform 150ms ease;
+}
+.citation-pill:hover {
+  background: var(--accent);
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+/* Streaming cursor */
+.stream-cursor::after {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 1rem;
+  margin-left: 2px;
+  background: var(--accent);
+  vertical-align: text-bottom;
+  animation: blink 900ms step-end infinite;
+}
+@keyframes blink {
+  50% { opacity: 0; }
+}
+
+/* Highlight flash for citation-targeted card */
+.flash-highlight {
+  animation: flashbg 1400ms ease-out;
+}
+@keyframes flashbg {
+  0% { background-color: var(--accent-soft); }
+  100% { background-color: transparent; }
+}
+
+/* Mobile drawer transitions */
+.drawer {
+  transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.drawer-hidden-left { transform: translateX(-100%); }
+.drawer-hidden-right { transform: translateX(100%); }
+
+/* Progress bar fill transition */
+.progress-fill {
+  transition: width 500ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Message fade-in */
+@keyframes riseIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.rise-in {
+  animation: riseIn 260ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}

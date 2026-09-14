@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>WebRAG — Turn Any Website Into a Research Workspace</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          paper: '#faf8f4',
+          ink: '#1c1b19',
+          accent: '#1f4b3f',
+        },
+        fontFamily: {
+          serif: ['Newsreader', 'Georgia', 'serif'],
+          sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        },
+      },
+    },
+  };
+</script>
+<link rel="stylesheet" href="/css/styles.css" />
+</head>
+<body class="min-h-screen bg-paper text-ink font-sans">
+
+  <!-- Top bar -->
+  <header class="border-b border-[--line]">
+    <div class="max-w-6xl mx-auto px-5 sm:px-8 py-5 flex items-center justify-between">
+      <a href="/index.html" class="font-serif-edit text-xl tracking-tight">WebRAG</a>
+      <nav class="flex items-center gap-6 text-sm">
+        <a href="/workspaces.html" class="text-[--ink-soft] hover:text-ink transition-colors">Workspaces</a>
+        <a href="#privacy" class="hidden sm:inline text-[--ink-soft] hover:text-ink transition-colors">Privacy</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Hero -->
+  <main>
+    <section class="max-w-3xl mx-auto px-5 sm:px-8 pt-16 sm:pt-24 pb-12 text-center">
+      <p class="uppercase tracking-[0.18em] text-xs text-[--ink-faint] font-semibold mb-5">Website research, grounded</p>
+      <h1 class="font-serif-edit text-4xl sm:text-5xl leading-[1.1] tracking-tight">
+        Turn Any Website Into a Research Workspace
+      </h1>
+      <p class="mt-5 text-lg text-[--ink-soft] max-w-xl mx-auto leading-relaxed">
+        Paste a website URL and WebRAG crawls it, builds a real retrieval-augmented
+        knowledge base, and lets you ask grounded questions with citations back to the source.
+      </p>
+
+      <form id="create-form" class="mt-10 text-left">
+        <label for="url-input" class="sr-only">Website URL</label>
+        <div class="flex flex-col sm:flex-row gap-3">
+          <input
+            id="url-input"
+            type="url"
+            required
+            placeholder="https://example.com/docs"
+            class="flex-1 min-w-0 px-4 py-3.5 text-base rounded-md border border-[--line-strong] bg-white focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent placeholder:text-[--ink-faint]"
+          />
+          <button
+            type="submit"
+            id="submit-btn"
+            class="px-6 py-3.5 rounded-md bg-accent text-white font-medium text-base hover:bg-[--accent-hover] transition-colors disabled:opacity-60 disabled:cursor-not-allowed min-h-[44px]"
+          >
+            Build Knowledge Base
+          </button>
+        </div>
+        <p id="form-error" class="mt-2.5 text-sm text-[--red] hidden" role="alert"></p>
+        <p class="mt-2.5 text-xs text-[--ink-faint]">
+          We only crawl publicly accessible pages. Login-protected and restricted content is never accessed.
+        </p>
+      </form>
+    </section>
+
+    <!-- What WebRAG does -->
+    <section class="max-w-5xl mx-auto px-5 sm:px-8 py-14 border-t border-[--line]">
+      <h2 class="font-serif-edit text-2xl mb-8">What WebRAG does</h2>
+      <div class="grid sm:grid-cols-3 gap-8">
+        <div>
+          <p class="text-xs font-semibold uppercase tracking-wide text-accent mb-2">01 — Crawl</p>
+          <p class="text-[--ink-soft] leading-relaxed">Discovers and fetches allowed pages within scope, respecting robots.txt and rate limits.</p>
+        </div>
+        <div>
+          <p class="text-xs font-semibold uppercase tracking-wide text-accent mb-2">02 — Index</p>
+          <p class="text-[--ink-soft] leading-relaxed">Extracts clean content, chunks it by section, and generates real embeddings into a vector index.</p>
+        </div>
+        <div>
+          <p class="text-xs font-semibold uppercase tracking-wide text-accent mb-2">03 — Research</p>
+          <p class="text-[--ink-soft] leading-relaxed">Ask, compare, summarize, or extract — every answer is grounded with clickable citations.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Supported sources -->
+    <section class="max-w-5xl mx-auto px-5 sm:px-8 py-14 border-t border-[--line]">
+      <h2 class="font-serif-edit text-2xl mb-6">Supported sources</h2>
+      <ul class="grid sm:grid-cols-2 gap-x-10 gap-y-3 text-[--ink-soft]">
+        <li class="flex gap-2"><span class="text-accent">—</span> Public articles and blog posts</li>
+        <li class="flex gap-2"><span class="text-accent">—</span> Documentation and knowledge-base sites</li>
+        <li class="flex gap-2"><span class="text-accent">—</span> Product and API documentation</li>
+        <li class="flex gap-2"><span class="text-accent">—</span> General public web pages</li>
+      </ul>
+      <p class="mt-5 text-sm text-[--ink-faint]">
+        WebRAG will not crawl login-protected pages, private dashboards, CAPTCHA-protected systems, or sites that disallow automated access.
+      </p>
+    </section>
+
+    <!-- Privacy -->
+    <section id="privacy" class="max-w-5xl mx-auto px-5 sm:px-8 py-14 border-t border-[--line]">
+      <h2 class="font-serif-edit text-2xl mb-6">Privacy</h2>
+      <div class="grid sm:grid-cols-2 gap-8 text-[--ink-soft] leading-relaxed">
+        <div>
+          <p class="font-medium text-ink mb-1">What's crawled</p>
+          <p>Only publicly reachable pages within the scope you configure. No credentials, cookies, or authenticated sessions are ever used.</p>
+        </div>
+        <div>
+          <p class="font-medium text-ink mb-1">What's stored</p>
+          <p>Extracted page content, chunk text, embeddings, and metadata for the workspace you create — nothing else.</p>
+        </div>
+        <div>
+          <p class="font-medium text-ink mb-1">Where & how long</p>
+          <p>Data is stored locally on the server's filesystem/index under your workspace. It persists until you delete the workspace.</p>
+        </div>
+        <div>
+          <p class="font-medium text-ink mb-1">External providers</p>
+          <p>Chunk text is sent to your configured embedding and LLM providers (e.g. OpenAI, Gemini) solely to generate embeddings and grounded answers.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Example questions -->
+    <section class="max-w-5xl mx-auto px-5 sm:px-8 py-14 border-t border-[--line]">
+      <h2 class="font-serif-edit text-2xl mb-6">Example research questions</h2>
+      <div class="flex flex-wrap gap-2.5">
+        <span class="px-3.5 py-2 rounded-full border border-[--line-strong] text-sm text-[--ink-soft] bg-white">"What authentication method does this site recommend?"</span>
+        <span class="px-3.5 py-2 rounded-full border border-[--line-strong] text-sm text-[--ink-soft] bg-white">"Compare the pricing plans described here."</span>
+        <span class="px-3.5 py-2 rounded-full border border-[--line-strong] text-sm text-[--ink-soft] bg-white">"Extract all API endpoints mentioned."</span>
+        <span class="px-3.5 py-2 rounded-full border border-[--line-strong] text-sm text-[--ink-soft] bg-white">"Summarize the entire site."</span>
+      </div>
+    </section>
+
+    <!-- Recent workspaces -->
+    <section class="max-w-5xl mx-auto px-5 sm:px-8 py-14 border-t border-[--line]">
+      <div class="flex items-baseline justify-between mb-6">
+        <h2 class="font-serif-edit text-2xl">Recent workspaces</h2>
+        <a href="/workspaces.html" class="text-sm text-accent hover:underline">View all &rarr;</a>
+      </div>
+      <div id="recent-workspaces" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <p class="text-sm text-[--ink-faint]">Loading…</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="border-t border-[--line] py-8">
+    <div class="max-w-6xl mx-auto px-5 sm:px-8 text-xs text-[--ink-faint]">
+      WebRAG — a serious RAG engineering research tool, not a generic chatbot.
+    </div>
+  </footer>
+
+  <script type="module" src="/js/landing.js"></script>
+</body>
+</html>

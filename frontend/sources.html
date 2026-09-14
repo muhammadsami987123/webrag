@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>WebRAG — Sources</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: { paper: '#faf8f4', ink: '#1c1b19', accent: '#1f4b3f' },
+        fontFamily: { serif: ['Newsreader', 'Georgia', 'serif'], sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'] },
+      },
+    },
+  };
+</script>
+<link rel="stylesheet" href="/css/styles.css" />
+</head>
+<body class="min-h-screen bg-paper text-ink font-sans">
+
+  <header class="border-b border-[--line]">
+    <div class="max-w-6xl mx-auto px-5 sm:px-8 py-5 flex items-center gap-4">
+      <a href="/index.html" class="font-serif-edit text-lg tracking-tight shrink-0">WebRAG</a>
+      <span class="text-[--line-strong]">/</span>
+      <a id="ws-link" href="#" class="text-sm text-[--ink-soft] hover:text-ink truncate">Workspace</a>
+      <span class="text-[--line-strong]">/</span>
+      <span class="text-sm">Sources</span>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-5 sm:px-8 py-8">
+    <div class="flex flex-wrap items-end justify-between gap-4 mb-6">
+      <div>
+        <h1 class="font-serif-edit text-2xl">Sources</h1>
+        <p id="source-count" class="text-sm text-[--ink-faint] mt-1"></p>
+      </div>
+      <div class="flex items-center gap-2">
+        <input id="search-input" type="text" placeholder="Search sources…" class="px-3.5 py-2.5 text-sm rounded-md border border-[--line-strong] bg-white focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent min-w-[220px]" />
+        <select id="sort-select" class="px-3 py-2.5 text-sm rounded-md border border-[--line-strong] bg-white focus:outline-none">
+          <option value="title">Sort: Title</option>
+          <option value="word_count">Sort: Word count</option>
+          <option value="updated_at">Sort: Last indexed</option>
+          <option value="status">Sort: Status</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="error-banner" class="hidden mb-6 px-4 py-3 rounded-md bg-[--red-soft] text-[--red] text-sm"></div>
+
+    <div class="overflow-x-auto border border-[--line] rounded-md bg-white">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-[--line] text-left text-xs uppercase tracking-wide text-[--ink-faint]">
+            <th class="px-4 py-3 font-medium">Title</th>
+            <th class="px-4 py-3 font-medium">URL</th>
+            <th class="px-4 py-3 font-medium">Words</th>
+            <th class="px-4 py-3 font-medium">Status</th>
+            <th class="px-4 py-3 font-medium">Last indexed</th>
+          </tr>
+        </thead>
+        <tbody id="sources-tbody">
+          <tr><td colspan="5" class="px-4 py-6 text-center text-[--ink-faint]">Loading sources…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+
+  <script type="module" src="/js/sources.js"></script>
+</body>
+</html>

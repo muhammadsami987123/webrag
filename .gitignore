@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+env/
+.env
+storage/workspaces/
+*.egg-info/
+.DS_Store
+node_modules/
+*.log
+.idea/
+.vscode/
+
+# Claude Code local tooling (not project code)
+.claude/
