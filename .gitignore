@@ -5,7 +5,7 @@ __pycache__/
 venv/
 env/
 .env
-storage/workspaces/
+data/
 *.egg-info/
 .DS_Store
 node_modules/

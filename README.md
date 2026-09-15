@@ -1,298 +1,213 @@
 # WebRAG
 
-**NotebookLM for websites, built as a serious RAG engineering product.**
+**Chat with any website or document — grounded, cited, streaming answers powered by your own OpenAI key.**
 
-Paste a website URL. WebRAG crawls it (safely), extracts and chunks the real content, embeds it, indexes it, and lets you interrogate it with grounded, cited, streaming answers — not a chatbot wrapper that forwards your URL to an LLM and hopes for the best.
+Paste a URL and WebRAG crawls the site (safely, staying on the same domain), or drop in a PDF/DOCX/TXT/MD/CSV file. Everything gets chunked, embedded, and indexed. Ask a question and get a streamed answer with numbered `[1]` citations back to the exact source — never an ungrounded guess.
 
-> URL → Crawl → Understand → Index → Retrieve → Reason → Cite → Research
+> URL or file → extract → chunk → embed → index → retrieve → answer with citations
 
 ---
 
 ## Table of Contents
 
 - [Why WebRAG](#why-webrag)
-- [Key Features](#key-features)
+- [Features](#features)
 - [Architecture](#architecture)
 - [Tech Stack](#tech-stack)
 - [Project Structure](#project-structure)
 - [Quickstart](#quickstart)
 - [Configuration](#configuration)
-- [API Overview](#api-overview)
+- [API Reference](#api-reference)
 - [Security](#security)
 - [Testing](#testing)
-- [Roadmap & Limitations](#roadmap--limitations)
-- [Contributing](#contributing)
+- [Limitations & Roadmap](#limitations--roadmap)
 - [License](#license)
 
 ---
 
 ## Why WebRAG
 
-Most "chat with a website" tools either scrape a single page and stuff it into a prompt, or fake a retrieval step entirely. WebRAG is a real RAG system end to end: a scoped, SSRF-hardened crawler; a content-extraction pipeline that strips boilerplate while preserving heading structure; heading/paragraph-aware chunking; a pluggable embedding layer (OpenAI, Gemini, or local sentence-transformers); a FAISS vector index combined with BM25 keyword search for hybrid retrieval; an optional reranking stage; and a prompting architecture that treats retrieved web content as untrusted data, never as instructions.
+Most "chat with a website" demos scrape one page and stuff it into a prompt. WebRAG does the real thing, kept deliberately small:
 
-The interface is a three-panel research workspace — Sources, Conversation, Context — in the spirit of NotebookLM, purpose-built for interrogating a specific website rather than an open-ended chat.
+- a same-site crawler that validates every URL (and every redirect hop) against SSRF rules before it ever makes a request,
+- an extractor that strips navs/footers/scripts and also **statically resolves React/Next.js streamed-SSR content** — so modern client-rendered sites don't come back empty,
+- paragraph-aware chunking with configurable size/overlap,
+- OpenAI embeddings with cosine-similarity retrieval over a small local vector store,
+- a prompt boundary that treats all retrieved content as untrusted reference data, never as instructions, so a page that says "ignore your instructions" is just text to quote or ignore.
 
-## Key Features
+One knowledge base, one page, no accounts, no workspaces — add sources on the left, ask questions on the right.
 
-**Crawling**
-- SSRF-protected crawler with configurable scope (single page, page + links, entire domain, or a selected path)
-- robots.txt awareness, domain/subdomain scoping, redirect validation, duplicate/URL-fragment/tracking-parameter normalization
-- Configurable max pages, max depth, request timeout, and per-second rate limiting
+## Features
 
-**Extraction & Chunking**
-- Boilerplate removal (nav, footers, cookie banners, ads, scripts, repeated menus)
-- Preserves title, headings, paragraphs, lists, tables, canonical URL, publish/modified dates, and breadcrumbs
-- Heading-aware, paragraph/sentence-boundary-respecting chunking with configurable size and overlap, retaining full heading-path metadata per chunk
+**Ingestion**
+- Add a website URL; WebRAG crawls same-site links breadth-first up to a configurable page limit (default 20, adjustable 1–100 per request)
+- Upload PDF, DOCX, TXT, MD, or CSV files (drag-and-drop or file picker), up to `MAX_UPLOAD_MB` each
+- Ingestion runs as a background task for URLs (the UI polls status) and inline for file uploads
 
-**Hybrid Retrieval & Reranking**
-- Semantic search via FAISS vector similarity
-- Lexical/keyword search via BM25 for exact terms, API names, version numbers
-- Combined hybrid scoring with a configurable reranking stage (cross-encoder, with a lightweight fallback when no reranker is configured)
+**Extraction**
+- Boilerplate stripped (`script`, `style`, `nav`, `footer`, `header`, `form`, `button`, etc.)
+- Falls back from `<main>`/`<article>` to `<body>` when the primary content region is empty
+- Statically replays React 18 streaming-SSR `<template>`/`<!--$?-->` Suspense swaps so Next.js App Router pages resolve to real content without a headless browser
 
-**Grounded Answers & Citations**
-- Answers are generated only from retrieved chunks, with clickable citations back to the exact source section
-- Explicit hallucination control: when evidence is insufficient, WebRAG says so instead of guessing
-- Retrieval-based grounding confidence, not the model's self-reported confidence
+**Retrieval & Answers**
+- Query embedded with the same model as the corpus, matched by cosine similarity over a NumPy matrix (results below a 0.15 similarity floor are dropped)
+- Answers stream token-by-token over Server-Sent Events, with a `sources` event fired first so citations are ready before the first token renders
+- Numbered `[1]`/`[2]` citations in the answer map to clickable source cards (with snippet + link back to the page)
+- Last 6 turns of conversation history are sent with each request for follow-up questions
 
-**Streaming Chat**
-- Real token-by-token streaming over Server-Sent Events, with citations attached as they resolve
-- Conversation memory for follow-up questions, without letting prior turns override retrieved evidence
-
-**Research Modes**
-- **Ask** — fast grounded answer
-- **Research** — deeper multi-source synthesis
-- **Compare** — structured comparison across sources
-- **Summarize** — page, selection, or whole-workspace summarization (hierarchical for large sites)
-- **Explain** — concept explanation grounded strictly in indexed content
-- **Extract** — structured extraction (tables of endpoints, plans, integrations, etc.)
-
-**Workspace & Source Management**
-- Topic extraction, dynamically generated ask-suggestions, source selection scoping ("ask selected sources" vs. "ask entire knowledge base")
-- Re-indexing with content-hash based change detection — new/changed/removed pages, embeddings reused for unchanged content
-- Notes, highlights, saved questions, collections, and research threads
-- RAG debug panel (similarity, keyword, and rerank scores, final context, citation mapping) — developer-only
+**Frontend**
+- Single page, Tailwind CDN, vanilla JS — no build step, edit and refresh
+- Light/dark theme (persisted to `localStorage`), responsive sidebar drawer on mobile
+- Live source list with processing/ready/failed status, chunk counts, one-click delete
+- Toast notifications when a source finishes indexing or fails
 
 **Security**
-- Strong SSRF protection (private/link-local IP ranges, cloud metadata endpoints, internal hostnames, redirect re-validation)
-- `file://`, `ftp://`, `gopher://` and other non-HTTP(S) schemes are rejected outright
-- Prompt-injection resistant prompting architecture — retrieved web content can never override system instructions
+- All outbound crawl requests go through one SSRF-safe fetcher (`app/web.py`) that resolves DNS, rejects private/loopback/link-local/reserved IPs, and re-validates on every redirect hop
+- `http`/`https` only — no `file://`, `ftp://`, etc.
+- Response size capped at 5 MB per page; non-HTML responses rejected
+- Retrieved web/file content is only ever placed inside `<sources>` tags in the *user* message — never the system prompt — so it can't override the assistant's instructions
 
 ## Architecture
 
 ```
-                              ┌─────────────────────────────────────────────────┐
-                              │                  INGESTION                      │
-                              │                                                 │
-   URL ──▶ Crawl ──▶ Extract ──▶ Chunk ──▶ Embed ──▶ Index (FAISS + BM25)       │
-        (SSRF-safe)  (clean    (heading-  (pluggable  (per-workspace vector    │
-                      content)  aware)     provider)    + metadata store)      │
-                              └─────────────────────────────────────────────────┘
-                                                    │
-                                                    ▼
-                              ┌─────────────────────────────────────────────────┐
-                              │                   RETRIEVAL                     │
-                              │                                                 │
-   Query ──▶ Normalize ──▶ Hybrid Search ──▶ Rerank ──▶ Context Build           │
-                          (vector + BM25)  (cross-encoder /                    │
-                                            fallback score)                    │
-                              └─────────────────────────────────────────────────┘
-                                                    │
-                                                    ▼
-                              ┌─────────────────────────────────────────────────┐
-                              │                   GENERATION                    │
-                              │                                                 │
-   Grounded Context ──▶ LLM (streamed) ──▶ Answer + Citations                  │
-   (untrusted-data                        (source, section,                   │
-    prompt guard)                          chunk, score)                      │
-                              └─────────────────────────────────────────────────┘
-```
-
-Three-panel research UI:
-
-```
-┌───────────────────────────────────────────────────────┐
-│ WebRAG                                      Settings   │
-├──────────────┬─────────────────────────┬──────────────┤
-│ SOURCES      │ RESEARCH                │ CONTEXT      │
-│              │                         │              │
-│ 47 pages     │ User question           │ Retrieved    │
-│              │                         │ Sources      │
-│ ✓ API Docs   │ AI answer...            │              │
-│ ✓ Security   │ [1] [2]                 │ Source #1    │
-│ ✓ Pricing    │                         │ Source #2    │
-│              │                         │              │
-│ TOPICS       │ Ask a question...       │ Preview      │
-│              │                         │              │
-│ API          │                         │              │
-│ Security     │                         │              │
-└──────────────┴─────────────────────────┴──────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│                             INGESTION                             │
+│                                                                    │
+│  URL ──▶ safe crawl ──▶ extract to text ──▶ chunk ──▶ embed ──┐  │
+│  (SSRF-checked,        (boilerplate strip,   (paragraph-      │  │
+│   same-site BFS)        streamed-SSR fix)     aware, overlap) │  │
+│  File ─▶ parse (pypdf / python-docx / text) ──────────────────┘  │
+│                                                                    │
+│                              ▼                                    │
+│                 store.py — sources.json / chunks.json / vectors.npy
+└──────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌──────────────────────────────────────────────────────────────────┐
+│                              RETRIEVAL                            │
+│                                                                    │
+│  Question ──▶ embed ──▶ cosine similarity search ──▶ top-K chunks │
+└──────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌──────────────────────────────────────────────────────────────────┐
+│                              GENERATION                           │
+│                                                                    │
+│  <sources> (untrusted, user-role only) + question ──▶ OpenAI ──▶  │
+│  streamed answer with [n] citations, over SSE                     │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
 ## Tech Stack
 
-**Backend:** Python, FastAPI, Pydantic, Uvicorn, FAISS, BM25, httpx, background tasks + SSE for streaming ingestion/chat progress
+**Backend:** Python, FastAPI, Pydantic Settings, Uvicorn, httpx (SSRF-safe fetch), BeautifulSoup + lxml (extraction), pypdf, python-docx, NumPy (vector search), OpenAI SDK (embeddings + streaming chat)
 
-**Frontend:** Plain HTML, Tailwind CSS (CDN, no build step), modular vanilla JavaScript, Fetch API + Server-Sent Events
+**Frontend:** Plain HTML, Tailwind CSS (CDN, no build step), vanilla JavaScript, `marked` + `DOMPurify` (sanitized Markdown rendering), Fetch API + Server-Sent Events
 
-**Storage:** Local filesystem-backed per-workspace document/chunk/embedding/FAISS-index storage, designed for a future PostgreSQL + pgvector migration
-
-**LLM / Embeddings:** Pluggable providers — OpenAI, Gemini, or a local sentence-transformers model — selected entirely via environment variables, never hardcoded
+**Storage:** Flat files under `data/` — `sources.json`, `chunks.json`, `vectors.npy` — written atomically with a Windows-safe retry on file-lock contention
 
 ## Project Structure
 
 ```
 app/
-  main.py                 FastAPI app entrypoint
-  config.py                Environment-driven settings
-  api/                      HTTP route handlers
-    workspaces.py           Workspace CRUD + status
-    crawler.py               Crawl configuration + trigger endpoints
-    sources.py                Source library + source viewer endpoints
-    chat.py                    Streaming chat (SSE)
-    search.py                   Semantic/keyword search endpoint
-    summaries.py                  Page/selection/workspace summarization
-    topics.py                      Auto-extracted topics
-    compare.py                      Comparison mode
-    extraction.py                    Structured extraction mode
-  rag/                      Core RAG pipeline
-    ingestion.py             Orchestrates crawl → extract → chunk → embed → index
-    extraction.py             Content extraction (boilerplate removal, structure)
-    chunking.py                 Heading/paragraph-aware semantic chunking
-    embeddings.py                 Embedding provider abstraction/factory
-    retrieval.py                   Hybrid (vector + BM25) retrieval
-    reranking.py                     Reranking abstraction + fallback scorer
-    prompting.py                      Grounded prompt construction, injection defense
-    citations.py                       Citation extraction/mapping
-    llm.py                              LLM provider abstraction/factory
-  services/                 Business logic orchestration
-    crawler_service.py       SSRF-safe crawl execution
-    source_service.py         Source lifecycle management
-    workspace_service.py       Workspace lifecycle, persistence
-    research_service.py         Research-mode orchestration (Ask/Research/Compare/...)
-  storage/                  Persistence abstractions
-    document_store.py        Document/page storage
-    vector_store.py           FAISS index read/write per workspace
-    metadata_store.py          Chunk/workspace metadata
-  models/                   Internal domain models
-  schemas/                  Pydantic request/response schemas (single source of truth)
-  utils/                    Shared helpers (incl. SSRF-safe HTTP client)
+  main.py       FastAPI routes: add URL/files, list/delete sources, streaming chat
+  config.py     Settings loaded from .env (pydantic-settings)
+  web.py        SSRF-safe HTTP fetch + same-site BFS crawler
+  extract.py    HTML/file → text (incl. streamed-SSR fix), text → chunks
+  llm.py        OpenAI embeddings + streaming chat; system prompt lives here
+  store.py      Single knowledge base: sources, chunks, vectors, atomic persistence
 frontend/
-  css/                      Tailwind-based styling
-  js/                       Modular vanilla JS (workspace, chat, sources, topics, search)
-storage/
-  workspaces/<id>/           Per-workspace filesystem storage
-    documents/ chunks/ embeddings/ index/ metadata.json
+  index.html    Single-page UI (Tailwind CDN)
+  app.js        All UI behavior — sources, uploads, chat, theming
 tests/
-  crawler/ extraction/ rag/ security/ api/
+  test_app.py   Offline tests (extraction, chunking, SSRF guard, API with OpenAI faked)
+data/           Created at runtime — sources.json, chunks.json, vectors.npy
 ```
 
 ## Quickstart
 
 ```bash
 # 1. Clone
-git clone <your-fork-url> ragweb
+git clone <this-repo>
 cd ragweb
 
 # 2. Create a virtual environment
 python -m venv .venv
-.venv\Scripts\activate          # Windows
-# source .venv/bin/activate     # macOS/Linux
+.venv\Scripts\activate        # Windows
+# source .venv/bin/activate   # macOS/Linux
 
 # 3. Install dependencies
 pip install -r requirements.txt
 
 # 4. Configure environment
-cp .env.example .env
-```
+copy .env.example .env        # Windows; use `cp` on macOS/Linux
+# then edit .env and set OPENAI_API_KEY=sk-...
 
-Fill in `.env` with either:
-- a configured LLM provider key (`OPENAI_API_KEY` or `GEMINI_API_KEY`, matching `LLM_PROVIDER`), **or**
-- `EMBEDDING_PROVIDER=local` to run embeddings fully offline with a local sentence-transformers model (an LLM key is still required for answer generation)
-
-```bash
 # 5. Run the dev server
 uvicorn app.main:app --reload
 
 # 6. Open the app
-# http://localhost:8000
+# http://127.0.0.1:8000
 ```
 
-No build step is required for the frontend — it is plain HTML/Tailwind CDN/vanilla JS served directly by FastAPI, so edits are reflected on a browser refresh.
+Add a website URL or upload a file from the sidebar, wait for it to say "Ready," then ask a question.
 
 ## Configuration
 
-All configuration is environment-driven (see `app/config.py` and `.env.example`).
+All settings are read from `.env` (see `.env.example`) via `app/config.py`:
 
-| Variable | Description | Default |
+| Variable | Default | Description |
 |---|---|---|
-| `APP_ENV` | Application environment (`development`, `production`, etc.) | `development` |
-| `LLM_PROVIDER` | Answer-generation provider (`openai`, `gemini`) | `openai` |
-| `LLM_MODEL` | Model name for the selected LLM provider | provider default |
-| `OPENAI_API_KEY` | OpenAI API key (required if `LLM_PROVIDER=openai` or `EMBEDDING_PROVIDER=openai`) | — |
-| `GEMINI_API_KEY` | Gemini API key (required if `LLM_PROVIDER=gemini` or `EMBEDDING_PROVIDER=gemini`) | — |
-| `EMBEDDING_PROVIDER` | Embedding provider (`openai`, `gemini`, `local`) | `local` |
-| `EMBEDDING_MODEL` | Embedding model name | provider default |
-| `EMBEDDING_DIM` | Embedding vector dimensionality (must match the model) | model default |
-| `RERANKER_PROVIDER` | Reranker backend (`cross-encoder`, `none`) | `none` |
-| `MAX_CRAWL_PAGES` | Maximum pages crawled per workspace | `50` |
-| `MAX_CRAWL_DEPTH` | Maximum crawl depth from the seed URL | `3` |
-| `REQUEST_TIMEOUT` | Per-request HTTP timeout (seconds) | `10` |
-| `CRAWL_RATE_LIMIT_PER_SEC` | Max outbound requests per second during a crawl | `2` |
-| `MAX_RESPONSE_BYTES` | Max response body size accepted per page | `5_000_000` |
-| `STORAGE_PATH` | Root path for per-workspace filesystem storage | `storage/workspaces` |
-| `CHUNK_SIZE` | Target chunk size (characters/tokens, per chunker) | `800` |
-| `CHUNK_OVERLAP` | Overlap between adjacent chunks | `120` |
-| `RETRIEVAL_TOP_K` | Number of chunks returned to the LLM after reranking | `8` |
-| `RETRIEVAL_CANDIDATE_K` | Number of candidates retrieved before reranking | `30` |
+| `OPENAI_API_KEY` | *(empty)* | Required for embeddings and chat. The app runs but refuses to embed/chat without it. |
+| `LLM_MODEL` | `gpt-4o-mini` | Chat completion model used to generate answers. |
+| `EMBEDDING_MODEL` | `text-embedding-3-small` | Embedding model used for both corpus and query vectors. |
+| `DATA_DIR` | `data` | Where `sources.json`, `chunks.json`, and `vectors.npy` are persisted. |
+| `MAX_PAGES` | `20` | Default crawl page limit (overridable per-request, 1–100). |
+| `MAX_UPLOAD_MB` | `20` | Max size per uploaded file. |
+| `REQUEST_TIMEOUT` | `15.0` | Per-request HTTP timeout (seconds) for crawling. |
+| `CHUNK_SIZE` | `1000` | Target characters per chunk. |
+| `CHUNK_OVERLAP` | `150` | Character overlap between consecutive chunks. |
+| `TOP_K` | `6` | Number of chunks retrieved per question. |
 
-## API Overview
+## API Reference
 
-| Module | Endpoints (purpose) |
-|---|---|
-| `api/workspaces.py` | Create, list, fetch, and delete research workspaces; knowledge-base status (pages, chunks, embeddings, topics, last indexed) |
-| `api/crawler.py` | Configure and trigger a crawl/re-index, stream crawl progress, view change-detection results |
-| `api/sources.py` | List sources, fetch a single source for the source viewer, source selection scoping |
-| `api/chat.py` | Streaming (SSE) grounded chat with conversation memory and citations |
-| `api/search.py` | Semantic + keyword search across the indexed knowledge base |
-| `api/summaries.py` | Page / selected-sources / whole-workspace summarization |
-| `api/topics.py` | Auto-extracted topics and topic-scoped retrieval |
-| `api/compare.py` | Structured multi-source comparison mode |
-| `api/extraction.py` | Structured data extraction mode (endpoints, plans, integrations, etc.) |
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/` | Serves the frontend. |
+| `GET` | `/api/status` | Whether `OPENAI_API_KEY` is configured, and the active chat model. |
+| `GET` | `/api/sources` | List all sources with status (`processing`/`ready`/`failed`), page/chunk counts. |
+| `POST` | `/api/sources/url` | Add a website. Body: `{ "url": "...", "max_pages": 20 }`. Returns `202` immediately; crawling/indexing runs in the background. |
+| `POST` | `/api/sources/files` | Upload one or more files (`multipart/form-data`, field `files`). Parses and indexes synchronously; returns each source's final status. |
+| `DELETE` | `/api/sources/{id}` | Remove a source and every chunk/vector derived from it. |
+| `POST` | `/api/chat` | Ask a question. Body: `{ "question": "...", "history": [{"role": "...", "content": "..."}] }`. Returns a `text/event-stream` of `sources` (once), `token` (repeated), and `done`/`error` events. |
 
 ## Security
 
-WebRAG accepts arbitrary user-supplied URLs, so security is treated as a first-class concern rather than an afterthought:
-
-- **SSRF protection** — every outbound crawl request is resolved and validated against private IPv4/IPv6 ranges, loopback, link-local addresses, cloud metadata endpoints, and internal hostnames, with the destination re-validated after every redirect hop. Only `http://` and `https://` schemes are permitted; `file://`, `ftp://`, and `gopher://` are rejected outright.
-- **Resource limits** — request timeouts, response-size caps, crawl page/depth limits, and rate limiting all bound the blast radius of a hostile or misbehaving target site.
-- **Prompt-injection defense** — retrieved website content is explicitly treated as untrusted data in the prompting layer (`app/rag/prompting.py`). Instructions embedded in scraped text (e.g. "ignore previous instructions...") are never allowed to influence system behavior; only the system/developer instructions author the model's behavior.
-- **Grounding integrity** — citations are only ever generated from chunks that were actually retrieved; the system will explicitly say when it lacks sufficient evidence rather than fabricate an answer.
-
-See spec sections 42–43 in `task.md` for the full security and prompt-injection requirements this implementation is built against.
+- **SSRF protection** (`app/web.py`): every URL — the one you paste and every link the crawler follows — is resolved via DNS and checked with `ipaddress.is_global` before any request is made; this check re-runs on every redirect hop, so a public URL that redirects to `169.254.169.254` or `localhost` is caught, not just the first hop. Only `http`/`https` schemes are accepted; internal-looking hostnames (`.local`, `.internal`, `localhost`) are rejected outright.
+- **Prompt-injection boundary** (`app/llm.py`): retrieved content is interpolated only inside a `<sources>` block of the *user* message, wrapped per-chunk in `<source id="n" title="...">`. The system prompt is fixed and instructs the model to treat sources as untrusted reference data and never follow instructions found inside them.
+- **Output sanitization**: the assistant's Markdown response is rendered with `marked` and then sanitized with `DOMPurify` before being inserted into the DOM.
+- **Response limits**: crawled pages are capped at 5 MB; non-HTML content types are rejected before the body is read.
 
 ## Testing
 
 ```bash
-pytest tests/
+pytest
 ```
 
-Test coverage spans:
-- **Crawler** — URL validation, redirect handling, robots.txt behavior, domain restrictions, duplicate-URL detection, SSRF protection, timeouts
-- **Extraction** — main-content extraction, navigation removal, heading preservation, duplicate-content removal
-- **RAG** — chunking, embedding, retrieval, hybrid search, reranking, citation mapping, grounding
-- **Security** — SSRF, malicious redirects, prompt injection, oversized responses
-- **API** — workspace creation, crawl status, search, chat, re-indexing, deletion
+`tests/test_app.py` covers, entirely offline (OpenAI calls are monkeypatched):
+- streamed-SSR HTML extraction and paragraph chunking,
+- DOCX/TXT parsing and rejection of unsupported file types,
+- the SSRF guard against loopback, link-local, cloud-metadata, and non-HTTP URLs,
+- the full upload → chat (with citations) → delete flow through the FastAPI app,
+- graceful handling of unsupported uploads.
 
-## Roadmap & Limitations
+## Limitations & Roadmap
 
-- **Storage is local-first by design.** Vector search runs on FAISS with a filesystem-backed per-workspace store — no external services required for a single-node deployment. The storage layer (`app/storage/`) is deliberately abstracted so a PostgreSQL + pgvector backend can be introduced later without touching the RAG pipeline.
-- **Reranking is optional.** With no external cross-encoder configured, a lightweight fallback scorer is used instead of a no-op.
-- **Single-node ingestion.** Crawling and embedding run as background tasks within the FastAPI process; horizontally scaling ingestion (a task queue/worker pool) is a natural next step for larger deployments.
-- **No multi-tenant auth yet.** Workspaces are local to a single deployment; adding authentication/authorization is out of scope for the current version.
-
-## Contributing
-
-Contributions are welcome. Please see [CONTRIBUTING.md](CONTRIBUTING.md) for local setup, branch naming, commit conventions, and how to run the test suite before opening a PR.
+- **Single knowledge base.** There's no per-project/workspace separation — every source you add is searchable by every question. Multi-workspace support is a natural next step if you need isolation.
+- **No reranking or keyword search.** Retrieval is pure cosine similarity over OpenAI embeddings; a BM25/hybrid stage would help with exact terms, IDs, or version numbers.
+- **No JS-rendering fallback.** The streamed-SSR fix handles React/Next.js server-streamed content statically, but a fully client-fetched SPA (data loaded after mount, with no SSR payload at all) will still index thin. No headless browser dependency is used by design.
+- **Single-process, filesystem storage.** `data/*.json` and `vectors.npy` are rewritten atomically on every change; this is fine for one deployment but isn't built for concurrent writers or horizontal scaling.
+- **No auth.** This is a single-user local/self-hosted tool as shipped.
 
 ## License
 
